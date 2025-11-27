@@ -403,7 +403,7 @@ public class FormBuilder<TModel> : ViewBase
 
         var (handleSubmit, isUploading) = Context.UseUploadAwareSubmit(_model, onSubmit);
 
-        var buttonGap = Scale switch
+        var buttonGap = _scale switch
         {
             Shared.Scale.Small => 4,
             Shared.Scale.Large => 8,
