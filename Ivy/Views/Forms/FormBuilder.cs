@@ -17,9 +17,9 @@ public class FormBuilder<TModel> : ViewBase
     private readonly List<string> _groups = [];
     private readonly Dictionary<string, bool> _groupOpenStates = [];
 
-    public Scale Scale { get; private set; } = Scale.Medium;
-    public string SubmitTitle { get; init; }
-    public FormValidationStrategy ValidationStrategy { get; set; }
+    internal Scale _scale = Shared.Scale.Medium;
+    internal Func<bool, Button> _submitBuilder;
+    internal FormValidationStrategy _validationStrategy;
 
     public FormBuilder(
         IState<TModel> model,
@@ -28,8 +28,28 @@ public class FormBuilder<TModel> : ViewBase
     {
         _model = model;
         _fields = FormScaffolder.ScaffoldFields<TModel>(_model.GetStateType());
-        SubmitTitle = submitTitle;
-        ValidationStrategy = validationStrategy;
+        SubmitTitle(submitTitle);
+        _validationStrategy = validationStrategy;
+    }
+
+    internal static Func<bool, Button> DefaultSubmitBuilder(string title) => (isLoading) => new Button(title).Loading(isLoading).Disabled(isLoading);
+
+    public FormBuilder<TModel> SubmitBuilder(Func<bool, Button> builder)
+    {
+        _submitBuilder = builder;
+        return this;
+    }
+
+    public FormBuilder<TModel> SubmitTitle(string title)
+    {
+        _submitBuilder = DefaultSubmitBuilder(title);
+        return this;
+    }
+
+    public FormBuilder<TModel> ValidationStrategy(FormValidationStrategy strategy)
+    {
+        _validationStrategy = strategy;
+        return this;
     }
 
     public FormBuilder<TModel> Builder(Expression<Func<TModel, object>> field, Func<IAnyState, IAnyInput> factory)
@@ -264,15 +284,15 @@ public class FormBuilder<TModel> : ViewBase
         return this;
     }
 
-    private FormBuilder<TModel> _SetScale(Scale scale)
+    public FormBuilder<TModel> Scale(Scale scale)
     {
-        Scale = scale;
+        _scale = scale;
         return this;
     }
 
-    public FormBuilder<TModel> Small() => _SetScale(Scale.Small);
-    public FormBuilder<TModel> Medium() => _SetScale(Scale.Medium);
-    public FormBuilder<TModel> Large() => _SetScale(Scale.Large);
+    public FormBuilder<TModel> Small() => Scale(Shared.Scale.Small);
+    public FormBuilder<TModel> Medium() => Scale(Shared.Scale.Medium);
+    public FormBuilder<TModel> Large() => Scale(Shared.Scale.Large);
 
     private FormBuilderField<TModel> GetField<TU>(Expression<Func<TModel, TU>> field)
     {
@@ -311,8 +331,8 @@ public class FormBuilder<TModel> : ViewBase
                     e.Required,
                     new FormFieldLayoutOptions(e.RowKey, e.Column, e.Order, e.Group),
                     e.Validators.ToArray(),
-                    ValidationStrategy,
-                    Scale,
+                    _validationStrategy,
+                    _scale,
                     e.Help,
                     e.Placeholder
                 );
@@ -346,7 +366,7 @@ public class FormBuilder<TModel> : ViewBase
         var formView = new FormView<TModel>(
             fieldViews,
             HandleSubmitEvent,
-            Scale,
+            _scale,
             _groupOpenStates
         );
 
@@ -388,11 +408,10 @@ public class FormBuilder<TModel> : ViewBase
 
         return Layout.Vertical()
                | formView
-               | Layout.Horizontal(new Button(SubmitTitle)
-                   .HandleClick(HandleSubmit)
-                   .Loading(submitting)
-                   .Disabled(submitting || hasUploading.Value)
-                   .Scale(Scale), validationView);
+               | Layout.Horizontal(
+                   _submitBuilder(submitting || hasUploading.Value).HandleClick(HandleSubmit).Scale(_scale),
+                   validationView
+                );
     }
 
     private static string InvalidMessage(int invalidFields)
