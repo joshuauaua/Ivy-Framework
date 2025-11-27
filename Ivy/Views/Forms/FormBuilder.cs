@@ -1,5 +1,4 @@
 using System.Linq.Expressions;
-using Ivy.Client;
 using Ivy.Core;
 using Ivy.Core.Helpers;
 using Ivy.Core.Hooks;
@@ -51,6 +50,8 @@ public class FormBuilder<TModel> : ViewBase
         _validationStrategy = strategy;
         return this;
     }
+
+    internal IState<TModel> GetModel() => _model;
 
     public FormBuilder<TModel> Builder(Expression<Func<TModel, object>> field, Func<IAnyState, IAnyInput> factory)
     {
@@ -385,31 +386,12 @@ public class FormBuilder<TModel> : ViewBase
     {
         (Func<Task<bool>> onSubmit, IView formView, IView validationView, bool submitting) = UseForm(this.Context);
 
-        var hasUploading = UseState(false);
-        var client = UseService<IClientProvider>();
-
-        UseEffect(() =>
-        {
-            hasUploading.Set(CheckForLoadingUploads(_model.Value));
-        }, _model);
-
-        async ValueTask HandleSubmit()
-        {
-            if (hasUploading.Value)
-            {
-                client.Toast(
-                    "File uploads are still in progress. Please wait for them to complete.",
-                    "Uploads in Progress"
-                );
-                return;
-            }
-            await onSubmit();
-        }
+        var (handleSubmit, isUploading) = Context.UseUploadAwareSubmit(_model, onSubmit);
 
         return Layout.Vertical()
                | formView
                | Layout.Horizontal(
-                   _submitBuilder(submitting || hasUploading.Value).HandleClick(HandleSubmit).Scale(_scale),
+                   _submitBuilder(submitting || isUploading).HandleClick(_ => handleSubmit()).Scale(_scale),
                    validationView
                 );
     }
