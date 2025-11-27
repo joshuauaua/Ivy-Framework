@@ -17,7 +17,7 @@ public class FormBuilder<TModel> : ViewBase
     private readonly Dictionary<string, bool> _groupOpenStates = [];
 
     internal Scale _scale = Shared.Scale.Medium;
-    internal Func<bool, Button> _submitBuilder;
+    internal Func<bool, Button> _submitBuilder = DefaultSubmitBuilder("Save");
     internal FormValidationStrategy _validationStrategy;
     internal Func<TModel, Task>? _onSubmit;
 
