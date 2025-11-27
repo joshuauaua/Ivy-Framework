@@ -19,6 +19,7 @@ public class FormBuilder<TModel> : ViewBase
     internal Scale _scale = Shared.Scale.Medium;
     internal Func<bool, Button> _submitBuilder;
     internal FormValidationStrategy _validationStrategy;
+    internal Func<TModel, Task>? _onSubmit;
 
     public FormBuilder(
         IState<TModel> model,
@@ -52,6 +53,16 @@ public class FormBuilder<TModel> : ViewBase
     }
 
     internal IState<TModel> GetModel() => _model;
+
+    /// <summary>
+    /// Sets a callback that is invoked after the form passes validation but before the model state is updated.
+    /// Use this for async operations like saving to a database.
+    /// </summary>
+    public FormBuilder<TModel> HandleSubmit(Func<TModel, Task> onSubmit)
+    {
+        _onSubmit = onSubmit;
+        return this;
+    }
 
     public FormBuilder<TModel> Builder(Expression<Func<TModel, object>> field, Func<IAnyState, IAnyInput> factory)
     {
@@ -346,6 +357,10 @@ public class FormBuilder<TModel> : ViewBase
             var results = await validationSignal.Send(new Unit());
             if (results.All(e => e))
             {
+                if (_onSubmit != null)
+                {
+                    await _onSubmit(currentModel.Value);
+                }
                 _model.Set(StateHelpers.DeepClone(currentModel.Value)!);
                 invalidFields.Set(0);
                 return true;
